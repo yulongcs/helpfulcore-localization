@@ -1,0 +1,7 @@
+# git ignore file
+_Lib*/
+packages*/
+obj*/
+bin*/
+.vs/config/applicationhost.config
+Sources/.vs*/

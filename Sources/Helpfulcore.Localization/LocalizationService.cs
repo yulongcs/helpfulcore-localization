@@ -1,0 +1,285 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using Sitecore.Data;
+using Sitecore.Data.Items;
+using Sitecore.Globalization;
+using Sitecore.Publishing;
+using Sitecore.SecurityModel;
+using Sitecore.Web.UI.WebControls;
+
+namespace Helpfulcore.Localization
+{
+	public class LocalizationService : ILocalizationService
+	{
+		private static readonly object CreateItemLock = new object();
+
+		public virtual bool AutoCreateDictionaryItems { get; set; }
+		public virtual bool UseDotSeparatedKeyNotaion { get; set; }
+
+		public virtual string Localize(string key, string defaultValue = null, bool editable = false)
+		{
+			if (string.IsNullOrWhiteSpace(key))
+			{
+				return defaultValue ?? key;
+			}
+
+			var localizedString = string.Empty;
+
+			if (this.IsInEditingMode && editable && this.UseDotSeparatedKeyNotaion)
+			{
+				var item = this.TryGetDictionaryPhraseItem(key);
+				if (item != null)
+				{
+					localizedString = new FieldRenderer { Item = item, FieldName = this.DictionaryPhraseFieldName}.Render();
+				}
+			}
+
+			if (!editable)
+			{
+				localizedString = Translate.Text(key);
+			}
+
+			if (!this.IsInEditingMode && (string.IsNullOrEmpty(localizedString) || localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase)) && this.AutoCreateDictionaryItems)
+			{
+				localizedString = this.GetOrCreateDictionaryText(key, defaultValue, editable);
+			}
+
+			if (!this.IsInEditingMode && !string.IsNullOrEmpty(defaultValue) && (string.IsNullOrEmpty(localizedString) || localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase)))
+			{
+				localizedString = defaultValue;
+			}
+
+			return localizedString;
+		}
+
+		protected virtual Item TryGetDictionaryPhraseItem(string key)
+		{
+			var db = this.GetContentDatabase();
+
+			if (db == null)
+			{
+				return null;
+			}
+
+			var dictionaryItemPath = this.GetDictionaryItemPath(key);
+
+			return db.GetItem(dictionaryItemPath);
+		}
+
+		protected virtual string GetOrCreateDictionaryText(string key, string defaultValue, bool editable)
+		{
+			var db = this.GetContentDatabase();
+
+			if (db == null)
+			{
+				return key;
+			}
+
+			var dictionaryItemPath = this.GetDictionaryItemPath(key);
+
+			var item = this.TryGetDictionaryPhraseItem(key) ?? this.CreateDictionaryEntryItem(key, defaultValue, db, dictionaryItemPath);
+
+			if (item != null)
+			{
+				if (string.IsNullOrEmpty(item[this.DictionaryPhraseFieldName]) && !string.IsNullOrEmpty(defaultValue))
+				{
+					this.UpdateDictionaryEntryItem(item, key, defaultValue);
+				}
+
+				return editable
+					? new FieldRenderer {Item = item, FieldName = this.DictionaryPhraseFieldName}.Render()
+					: string.IsNullOrEmpty(item[this.DictionaryPhraseFieldName]) ? key : item[this.DictionaryPhraseFieldName];
+			}
+
+			return key;
+		}
+
+		protected virtual void UpdateDictionaryEntryItem(Item item, string key, string phraseValue)
+		{
+			lock (CreateItemLock)
+			{
+				using (new SecurityDisabler())
+				{
+					try
+					{
+						item.Editing.BeginEdit();
+						item[this.DictionaryPhraseFieldName] = phraseValue;
+					}
+					catch
+					{
+						item.Editing.CancelEdit();
+					}
+					finally
+					{
+						item.Editing.EndEdit();
+					}
+				}
+
+				this.PublishItem(item);
+
+				Translate.RemoveKeyFromCache(key);
+			}
+		}
+
+		protected virtual Item CreateDictionaryEntryItem(string key, string defaultValue, Database db, string dictionaryItemPath)
+		{
+			lock (CreateItemLock)
+			{
+				Item item;
+				using (new SecurityDisabler())
+				{
+					item = db.CreateItemPath(dictionaryItemPath, this.DictionaryTemplateFolder, this.DictionaryTemplateItem);
+					try
+					{
+						item.Editing.BeginEdit();
+						item[this.DictionaryKeyFieldName] = key;
+						item[this.DictionaryPhraseFieldName] = defaultValue;
+					}
+					catch
+					{
+						item.Editing.CancelEdit();
+					}
+					finally
+					{
+						item.Editing.EndEdit();
+					}
+				}
+
+				this.PublishItem(item);
+
+				Translate.RemoveKeyFromCache(key);
+
+				return item;
+			}
+		}
+
+		protected virtual Database GetContentDatabase()
+		{
+			if (Sitecore.Context.Site == null)
+			{
+				return null;
+			}
+
+			var db = Sitecore.Context.Site.ContentDatabase;
+			if (db == null)
+			{
+				return null;
+			}
+
+			if (db.Name == "core")
+			{
+				db = Database.GetDatabase("master");
+			}
+
+			return !db.Name.Equals("master", StringComparison.InvariantCultureIgnoreCase) ? null : db;
+		}
+
+		protected Item GetDictionaryDomainItem()
+		{
+			var domainIdOrPath = "/sitecore/system/Dictionary";
+			if (Sitecore.Context.Site != null && !string.IsNullOrEmpty(Sitecore.Context.Site.DictionaryDomain))
+			{
+				domainIdOrPath = Sitecore.Context.Site.DictionaryDomain;
+			}
+
+			var db = this.GetContentDatabase();
+
+			if (db != null)
+			{
+				var item = db.GetItem(domainIdOrPath);
+
+				if (item != null)
+				{
+					return item;
+				}
+			}
+
+			return null;
+		}
+
+		protected virtual string GetDictionaryItemPath(string key)
+		{
+			var relativeItemPath = ItemUtil.ProposeValidItemName(key);
+
+			if (this.UseDotSeparatedKeyNotaion)
+			{
+				var textInfo = CultureInfo.InvariantCulture.TextInfo;
+				var splittedValue = key.Split(new[] {"."}, StringSplitOptions.RemoveEmptyEntries);
+				relativeItemPath = string.Join("/", splittedValue.Select(x => ItemUtil.ProposeValidItemName(textInfo.ToTitleCase(x))));
+			}
+
+			var domainItem = this.GetDictionaryDomainItem();
+
+			if (domainItem == null)
+			{
+				return "/sitecore/system/dictinary/" + relativeItemPath;
+			}
+
+			return domainItem.Paths.FullPath + "/" + relativeItemPath;
+		}
+
+		protected virtual void PublishItem(Item item)
+		{
+			PublishManager.PublishItem(item, this.PublishingTargets, new[] { item.Language }, false, false);
+
+		}
+
+		private Database[] publishingTargets;
+
+		private Database[] PublishingTargets
+		{
+			get
+			{
+				if (this.publishingTargets == null)
+				{
+					var targets = new List<Database>();
+
+					var publishingTargetsRoot = this.GetContentDatabase().GetItem("{D9E44555-02A6-407A-B4FC-96B9026CAADD}");
+					foreach (Item target in publishingTargetsRoot.Children)
+					{
+						var value = target[ID.Parse("{39ECFD90-55D2-49D8-B513-99D15573DE41}")];
+						if (target != null && !string.IsNullOrEmpty(value))
+						{
+							var db = Database.GetDatabase(value);
+							if (db != null)
+							{
+								targets.Add(db);
+							}
+						}
+					}
+
+					this.publishingTargets = targets.ToArray();
+				}
+
+				return this.publishingTargets;
+			}
+		}
+
+		protected virtual string DictionaryKeyFieldName
+		{
+			get { return "Key"; }
+		}
+
+		protected virtual string DictionaryPhraseFieldName
+		{
+			get { return "Phrase"; }
+		}
+
+		protected virtual bool IsInEditingMode
+		{
+			get { return Sitecore.Context.PageMode.IsExperienceEditor || Sitecore.Context.PageMode.IsExperienceEditorEditing; }
+		}
+
+		protected virtual TemplateItem DictionaryTemplateFolder
+		{
+			get { return this.GetContentDatabase().GetTemplate(new ID("{267D9AC7-5D85-4E9D-AF89-99AB296CC218}")); }
+		}
+
+		protected virtual TemplateItem DictionaryTemplateItem
+		{
+			get { return this.GetContentDatabase().GetTemplate(new ID("{6D1CD897-1936-4A3A-A511-289A94C2A7B1}")); }
+		}
+	}
+}
