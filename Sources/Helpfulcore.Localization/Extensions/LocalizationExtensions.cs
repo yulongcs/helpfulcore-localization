@@ -5,9 +5,14 @@ namespace Helpfulcore.Localization.Extensions
 {
     public static class LocalizationExtensions
     {
-        public static IHtmlString Localize(this SitecoreHelper sitecoreHelper, string key, string defaultValue = null, bool editable = false)
+        public static IHtmlString Localize(
+			this SitecoreHelper sitecoreHelper,
+			string key, 
+			string defaultValue = null,
+			bool editable = false, 
+			bool autoCreate = true)
         {
-            return new HtmlString(LocalizationFactory.LocalizationService.Localize(key, defaultValue, editable));
+            return new HtmlString(LocalizationFactory.LocalizationService.Localize(key, defaultValue, editable, autoCreate));
         }
     }
 }

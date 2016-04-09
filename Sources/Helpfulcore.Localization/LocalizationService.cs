@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
 using Sitecore.Data;
 using Sitecore.Data.Items;
 using Sitecore.Globalization;
@@ -18,7 +20,7 @@ namespace Helpfulcore.Localization
 		public virtual bool AutoCreateDictionaryItems { get; set; }
 		public virtual bool UseDotSeparatedKeyNotaion { get; set; }
 
-		public virtual string Localize(string key, string defaultValue = null, bool editable = false)
+		public virtual string Localize(string key, string defaultValue = null, bool editable = false, bool autoCreate = true)
 		{
 			if (string.IsNullOrWhiteSpace(key))
 			{
@@ -27,9 +29,21 @@ namespace Helpfulcore.Localization
 
 			var localizedString = string.Empty;
 
+			if (!autoCreate)
+			{
+				localizedString = Translate.Text(key);
+
+				if (!this.IsInEditingMode && !string.IsNullOrEmpty(defaultValue) && localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase))
+				{
+					return defaultValue;
+				}
+
+				return localizedString;
+			}
+			
 			if (this.IsInEditingMode && editable && this.UseDotSeparatedKeyNotaion)
 			{
-				var item = this.TryGetDictionaryPhraseItem(key);
+				var item = this.GetDictionaryPhraseItem(key);
 				if (item != null)
 				{
 					localizedString = new FieldRenderer { Item = item, FieldName = this.DictionaryPhraseFieldName}.Render();
@@ -54,7 +68,7 @@ namespace Helpfulcore.Localization
 			return localizedString;
 		}
 
-		protected virtual Item TryGetDictionaryPhraseItem(string key)
+		protected virtual Item GetDictionaryPhraseItem(string key)
 		{
 			var db = this.GetContentDatabase();
 
@@ -79,7 +93,7 @@ namespace Helpfulcore.Localization
 
 			var dictionaryItemPath = this.GetDictionaryItemPath(key);
 
-			var item = this.TryGetDictionaryPhraseItem(key) ?? this.CreateDictionaryEntryItem(key, defaultValue, db, dictionaryItemPath);
+			var item = this.GetDictionaryPhraseItem(key) ?? this.CreateDictionaryEntryItem(key, defaultValue, db, dictionaryItemPath);
 
 			if (item != null)
 			{
@@ -205,16 +219,15 @@ namespace Helpfulcore.Localization
 
 			if (this.UseDotSeparatedKeyNotaion)
 			{
-				var textInfo = CultureInfo.InvariantCulture.TextInfo;
 				var splittedValue = key.Split(new[] {"."}, StringSplitOptions.RemoveEmptyEntries);
-				relativeItemPath = string.Join("/", splittedValue.Select(x => ItemUtil.ProposeValidItemName(textInfo.ToTitleCase(x))));
+				relativeItemPath = string.Join("/", splittedValue.Select(x => this.ToPascalCase(ItemUtil.ProposeValidItemName(x))));
 			}
 
 			var domainItem = this.GetDictionaryDomainItem();
 
 			if (domainItem == null)
 			{
-				return "/sitecore/system/dictinary/" + relativeItemPath;
+				return "/sitecore/system/Dictionary/" + relativeItemPath;
 			}
 
 			return domainItem.Paths.FullPath + "/" + relativeItemPath;
@@ -222,8 +235,29 @@ namespace Helpfulcore.Localization
 
 		protected virtual void PublishItem(Item item)
 		{
-			PublishManager.PublishItem(item, this.PublishingTargets, new[] { item.Language }, false, false);
+			var toPublishList = new List<Item>();
+			var dictionaryRoot = this.GetDictionaryDomainItem();
+			if (dictionaryRoot != null)
+			{
+				var publishingItem = item;
 
+				while (publishingItem.ID != dictionaryRoot.ID)
+				{
+					toPublishList.Add(publishingItem);
+					publishingItem = publishingItem.Parent;
+				}
+
+				toPublishList.Reverse();
+
+				foreach (var toPublish in toPublishList)
+				{
+					PublishManager.PublishItem(toPublish, this.PublishingTargets, new[] {toPublish.Language}, false, false);
+				}
+			}
+			else
+			{
+				PublishManager.PublishItem(item, this.PublishingTargets, new[] {item.Language}, false, false);
+			}
 		}
 
 		private Database[] publishingTargets;
@@ -280,6 +314,33 @@ namespace Helpfulcore.Localization
 		protected virtual TemplateItem DictionaryTemplateItem
 		{
 			get { return this.GetContentDatabase().GetTemplate(new ID("{6D1CD897-1936-4A3A-A511-289A94C2A7B1}")); }
+		}
+
+		protected virtual string ToPascalCase(string s)
+		{
+			var result = new StringBuilder();
+			var nonWordChars = new Regex(@"[^a-zA-Z0-9]+");
+			var tokens = nonWordChars.Split(s);
+			foreach (var token in tokens)
+			{
+				result.Append(this.PascalCaseSingleWord(token));
+			}
+
+			return result.ToString();
+		}
+
+		protected virtual string PascalCaseSingleWord(string s)
+		{
+			var match = Regex.Match(s, @"^(?<word>\d+|^[a-z]+|[A-Z]+|[A-Z][a-z]+|\d[a-z]+)+$");
+			var groups = match.Groups["word"];
+
+			var textInfo = Thread.CurrentThread.CurrentCulture.TextInfo;
+			var result = new StringBuilder();
+			foreach (var capture in groups.Captures.Cast<Capture>())
+			{
+				result.Append(textInfo.ToTitleCase(capture.Value.ToLower()));
+			}
+			return result.ToString();
 		}
 	}
 }
