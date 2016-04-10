@@ -22,50 +22,66 @@ namespace Helpfulcore.Localization
 
 		public virtual string Localize(string key, string defaultValue = null, bool editable = false, bool autoCreate = true)
 		{
-			if (string.IsNullOrWhiteSpace(key))
+			try
 			{
-				return defaultValue ?? key;
-			}
-
-			var localizedString = string.Empty;
-
-			if (!autoCreate)
-			{
-				localizedString = Translate.Text(key);
-
-				if (!this.IsInEditingMode && !string.IsNullOrEmpty(defaultValue) && localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase))
+				if (!this.AutoCreateDictionaryItems)
 				{
-					return defaultValue;
+					autoCreate = false;
+				}
+
+				if (string.IsNullOrWhiteSpace(key))
+				{
+					return defaultValue ?? key;
+				}
+
+				var localizedString = string.Empty;
+
+				if (!autoCreate)
+				{
+					localizedString = Translate.Text(key);
+
+					if (!this.IsInEditingMode && !string.IsNullOrEmpty(defaultValue) &&
+					    localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase))
+					{
+						return defaultValue;
+					}
+
+					return localizedString;
+				}
+
+				if (this.IsInEditingMode && editable && this.UseDotSeparatedKeyNotaion)
+				{
+					var item = this.GetDictionaryPhraseItem(key);
+					if (item != null)
+					{
+						localizedString = new FieldRenderer {Item = item, FieldName = this.DictionaryPhraseFieldName}.Render();
+					}
+				}
+
+				if (!editable)
+				{
+					localizedString = Translate.Text(key);
+				}
+
+				if ((string.IsNullOrEmpty(localizedString) ||
+				     localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase)) && autoCreate)
+				{
+					localizedString = this.GetOrCreateDictionaryText(key, defaultValue, editable);
+				}
+
+				if (!this.IsInEditingMode && !string.IsNullOrEmpty(defaultValue) &&
+				    (string.IsNullOrEmpty(localizedString) ||
+				     localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase)))
+				{
+					localizedString = defaultValue;
 				}
 
 				return localizedString;
 			}
-			
-			if (this.IsInEditingMode && editable && this.UseDotSeparatedKeyNotaion)
+			catch
 			{
-				var item = this.GetDictionaryPhraseItem(key);
-				if (item != null)
-				{
-					localizedString = new FieldRenderer { Item = item, FieldName = this.DictionaryPhraseFieldName}.Render();
-				}
+				return Translate.Text(key);
 			}
-
-			if (!editable)
-			{
-				localizedString = Translate.Text(key);
-			}
-
-			if (!this.IsInEditingMode && (string.IsNullOrEmpty(localizedString) || localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase)) && this.AutoCreateDictionaryItems)
-			{
-				localizedString = this.GetOrCreateDictionaryText(key, defaultValue, editable);
-			}
-
-			if (!this.IsInEditingMode && !string.IsNullOrEmpty(defaultValue) && (string.IsNullOrEmpty(localizedString) || localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase)))
-			{
-				localizedString = defaultValue;
-			}
-
-			return localizedString;
 		}
 
 		protected virtual Item GetDictionaryPhraseItem(string key)
