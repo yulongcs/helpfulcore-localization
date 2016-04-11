@@ -54,11 +54,20 @@ namespace Helpfulcore.Localization
 					var item = this.GetDictionaryPhraseItem(key);
 					if (item != null)
 					{
-						localizedString = new FieldRenderer {Item = item, FieldName = this.DictionaryPhraseFieldName}.Render();
+						return new FieldRenderer {Item = item, FieldName = this.DictionaryPhraseFieldName}.Render();
 					}
 				}
 
-				if ((string.IsNullOrWhiteSpace(localizedString) || Translate.Text(key).Equals(key, StringComparison.InvariantCultureIgnoreCase)) && autoCreate)
+				Translate.RemoveKeyFromCache(key);
+				localizedString = Translate.Text(key);
+
+				if (localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase))
+				{
+					Translate.ResetCache(true);
+					localizedString = Translate.Text(key);
+				}
+
+				if (localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase))
 				{
 					localizedString = this.GetOrCreateDictionaryText(key, defaultValue, editable);
 				}
@@ -347,7 +356,10 @@ namespace Helpfulcore.Localization
 
 		protected virtual bool IsInEditingMode
 		{
-			get { return Sitecore.Context.PageMode.IsExperienceEditor || Sitecore.Context.PageMode.IsExperienceEditorEditing; }
+			get
+			{
+				return Sitecore.Context.PageMode.IsPageEditor || Sitecore.Context.PageMode.IsPageEditorDesigning;
+			}
 		}
 
 		protected virtual TemplateItem DictionaryTemplateFolder
