@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using Sitecore.Data;
 using Sitecore.Data.Items;
+using Sitecore.Diagnostics;
 using Sitecore.Globalization;
 using Sitecore.Publishing;
 using Sitecore.SecurityModel;
@@ -132,6 +133,14 @@ namespace Helpfulcore.Localization
 					{
 						item.Editing.BeginEdit();
 						item[this.DictionaryPhraseFieldName] = phraseValue;
+						Log.Debug(
+							string.Format(
+								"[LocalizationService]: Dictionary item with key '{0}' has been updated with default value '{1}'. Language: '{2}', dictionary item path: '{3}'", 
+								key, 
+								phraseValue, 
+								item.Language.Name, 
+								item.Paths.FullPath), 
+							this);
 					}
 					catch
 					{
@@ -162,6 +171,15 @@ namespace Helpfulcore.Localization
 						item.Editing.BeginEdit();
 						item[this.DictionaryKeyFieldName] = key;
 						item[this.DictionaryPhraseFieldName] = defaultValue;
+
+						Log.Debug(
+							string.Format(
+								"[LocalizationService]: Dictionary item with key '{0}' has been created with default value '{1}'. Language: '{2}', dictionary item path: '{3}'",
+								key,
+								defaultValue,
+								item.Language.Name,
+								item.Paths.FullPath),
+							this);
 					}
 					catch
 					{
@@ -264,11 +282,25 @@ namespace Helpfulcore.Localization
 				foreach (var toPublish in toPublishList)
 				{
 					PublishManager.PublishItem(toPublish, this.PublishingTargets, new[] {toPublish.Language}, false, false);
+
+					Log.Debug(
+						string.Format(
+							"[LocalizationService]: Dictionary item is being published... Language: '{0}', dictionary item path: '{1}'",
+							item.Language.Name,
+							item.Paths.FullPath),
+						this);
 				}
 			}
 			else
 			{
 				PublishManager.PublishItem(item, this.PublishingTargets, new[] {item.Language}, false, false);
+
+				Log.Debug(
+					string.Format(
+						"[LocalizationService]: Dictionary item is being published... Language: '{0}', dictionary item path: '{1}'",
+						item.Language.Name,
+						item.Paths.FullPath),
+					this);
 			}
 		}
 
