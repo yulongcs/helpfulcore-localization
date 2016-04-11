@@ -58,7 +58,7 @@ namespace Helpfulcore.Localization
 					}
 				}
 
-				if ((string.IsNullOrWhiteSpace(localizedString) || localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase)) && autoCreate)
+				if ((string.IsNullOrWhiteSpace(localizedString) || Translate.Text(key).Equals(key, StringComparison.InvariantCultureIgnoreCase)) && autoCreate)
 				{
 					localizedString = this.GetOrCreateDictionaryText(key, defaultValue, editable);
 				}
