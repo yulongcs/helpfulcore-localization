@@ -40,8 +40,7 @@ namespace Helpfulcore.Localization
 				{
 					localizedString = Translate.Text(key);
 
-					if (!this.IsInEditingMode && !string.IsNullOrEmpty(defaultValue) &&
-					    localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase))
+					if (!this.IsInEditingMode && !string.IsNullOrWhiteSpace(defaultValue) && localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase))
 					{
 						return defaultValue;
 					}
@@ -58,20 +57,17 @@ namespace Helpfulcore.Localization
 					}
 				}
 
-				if (!editable)
-				{
-					localizedString = Translate.Text(key);
-				}
-
-				if ((string.IsNullOrEmpty(localizedString) ||
-				     localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase)) && autoCreate)
+				if ((string.IsNullOrWhiteSpace(localizedString) || localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase)) && autoCreate)
 				{
 					localizedString = this.GetOrCreateDictionaryText(key, defaultValue, editable);
 				}
 
-				if (!this.IsInEditingMode && !string.IsNullOrEmpty(defaultValue) &&
-				    (string.IsNullOrEmpty(localizedString) ||
-				     localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase)))
+				if (!editable || !this.IsInEditingMode)
+				{
+					localizedString = Translate.Text(key);
+				}
+
+				if (!this.IsInEditingMode && !string.IsNullOrWhiteSpace(defaultValue) && (string.IsNullOrWhiteSpace(localizedString) || localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase)))
 				{
 					localizedString = defaultValue;
 				}
@@ -113,14 +109,14 @@ namespace Helpfulcore.Localization
 
 			if (item != null)
 			{
-				if (string.IsNullOrEmpty(item[this.DictionaryPhraseFieldName]) && !string.IsNullOrEmpty(defaultValue))
+				if (string.IsNullOrWhiteSpace(item[this.DictionaryPhraseFieldName]) && !string.IsNullOrWhiteSpace(defaultValue))
 				{
 					this.UpdateDictionaryEntryItem(item, key, defaultValue);
 				}
 
 				return editable
 					? new FieldRenderer {Item = item, FieldName = this.DictionaryPhraseFieldName}.Render()
-					: string.IsNullOrEmpty(item[this.DictionaryPhraseFieldName]) ? key : item[this.DictionaryPhraseFieldName];
+					: string.IsNullOrWhiteSpace(item[this.DictionaryPhraseFieldName]) ? key : item[this.DictionaryPhraseFieldName];
 			}
 
 			return key;
@@ -209,7 +205,7 @@ namespace Helpfulcore.Localization
 		protected Item GetDictionaryDomainItem()
 		{
 			var domainIdOrPath = "/sitecore/system/Dictionary";
-			if (Sitecore.Context.Site != null && !string.IsNullOrEmpty(Sitecore.Context.Site.DictionaryDomain))
+			if (Sitecore.Context.Site != null && !string.IsNullOrWhiteSpace(Sitecore.Context.Site.DictionaryDomain))
 			{
 				domainIdOrPath = Sitecore.Context.Site.DictionaryDomain;
 			}
@@ -290,7 +286,7 @@ namespace Helpfulcore.Localization
 					foreach (Item target in publishingTargetsRoot.Children)
 					{
 						var value = target[ID.Parse("{39ECFD90-55D2-49D8-B513-99D15573DE41}")];
-						if (target != null && !string.IsNullOrEmpty(value))
+						if (target != null && !string.IsNullOrWhiteSpace(value))
 						{
 							var db = Database.GetDatabase(value);
 							if (db != null)
