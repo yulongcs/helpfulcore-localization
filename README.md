@@ -63,11 +63,12 @@ So in result you can simply write in your .cshtml rendering next statements:
 @Html.Sitecore().Localize("header.socialNetworks.instagramm", editable:true)
 ```
 On first page load, relevant dictionary items will be created in your configured Dictionary Domain for the website (if no domain configured, the '/sitecore/system/Dictionary' will be used)
+```
 *[DictionaryDomainItem]/Header/SocialNetworks/Facebook - with default value "Facebook" in language the page were opened
 *[DictionaryDomainItem]/Header/SocialNetworks/Twitter - with default value "Twitter" in language the page were opened. In editing mode this phrase will be editable.
 *[DictionaryDomainItem]/Header/SocialNetworks/LinkedIn - with empty value in language the page were opened. 
 *[DictionaryDomainItem]/Header/SocialNetworks/Instagramm - with empty value in language the page were opened. In editing mode this phrase will be editable.
-
+```
 All phrases will be automatically published to all available publishing targets.
 
 ## Requirements
