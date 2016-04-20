@@ -73,6 +73,7 @@ All phrases will be automatically published to all available publishing targets.
 
 ## Requirements
 
-* Sitecore CMS 6+ is supported
+* Sitecore CMS 7+ is supported
+* Tested with Sitecore CMS 8.1
 * on Sitecore site definitions _content_ database must be configured 
 * use _dot.separated.key.format_ for dictionary keys with _camelNotation_
