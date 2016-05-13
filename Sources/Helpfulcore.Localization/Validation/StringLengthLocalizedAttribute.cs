@@ -10,7 +10,7 @@ namespace Helpfulcore.Localization.Validation
 
         public override string FormatErrorMessage(string name)
         {
-            return LocalizationFactory.LocalizationService.Localize(this.ErrorMessageResourceName);
+            return LocalizationFactory.LocalizationService.Localize(this.ErrorMessageResourceName, this.ErrorMessage);
         }
     }
 }
