@@ -54,6 +54,8 @@
     <Compile Include="LocalizationService.cs" />
     <Compile Include="Pipelines\Initialize\InitializeLocalizationService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Validation\CompareLocalizedAttribute.cs" />
+    <Compile Include="Validation\RangeLocalizedAttribute.cs" />
     <Compile Include="Validation\RegularExpressionLocalizedAttribute.cs" />
     <Compile Include="Validation\RequiredLocalizedAttribute.cs" />
     <Compile Include="Validation\StringLengthLocalizedAttribute.cs" />
