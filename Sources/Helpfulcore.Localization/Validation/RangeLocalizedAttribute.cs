@@ -23,5 +23,15 @@ namespace Helpfulcore.Localization.Validation
         {
             return LocalizationFactory.LocalizationService.Localize(this.ErrorMessageResourceName, this.ErrorMessage, this.Editable);
         }
+
+        public override bool IsValid(object value)
+        {
+            return base.IsValid(value);
+        }
+
+        protected override ValidationResult IsValid(object value, ValidationContext validationContext)
+        {
+            return base.IsValid(value, validationContext);
+        }
     }
 }
