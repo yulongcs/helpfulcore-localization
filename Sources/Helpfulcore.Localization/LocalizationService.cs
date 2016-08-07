@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using Sitecore.Data;
 using Sitecore.Data.Items;
+using Sitecore.Data.Managers;
 using Sitecore.Diagnostics;
 using Sitecore.Globalization;
 using Sitecore.Publishing;
@@ -21,7 +22,12 @@ namespace Helpfulcore.Localization
 		public virtual bool AutoCreateDictionaryItems { get; set; }
 		public virtual bool UseDotSeparatedKeyNotaion { get; set; }
 
-		public virtual string Localize(string key, string defaultValue = null, bool editable = false, bool autoCreate = true)
+		public virtual string Localize(
+			string key, 
+			string defaultValue = null, 
+			bool editable = false, 
+			string language = null,
+			bool autoCreate = true)
 		{
 			try
 			{
@@ -35,11 +41,11 @@ namespace Helpfulcore.Localization
 					return defaultValue ?? key;
 				}
 
-				var localizedString = string.Empty;
+				string localizedString;
 
 				if (!autoCreate)
 				{
-					localizedString = Translate.Text(key);
+					localizedString = this.TranslateText(key, language);
 
 					if (!this.IsInEditingMode && !string.IsNullOrWhiteSpace(defaultValue) && localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase))
 					{
@@ -49,9 +55,9 @@ namespace Helpfulcore.Localization
 					return localizedString;
 				}
 
-				if (this.IsInEditingMode && editable && this.UseDotSeparatedKeyNotaion)
+				if (this.IsInEditingMode && editable)
 				{
-					var item = this.GetDictionaryPhraseItem(key);
+					var item = this.GetDictionaryPhraseItem(key, language);
 					if (item != null)
 					{
 						return new FieldRenderer {Item = item, FieldName = this.DictionaryPhraseFieldName}.Render();
@@ -59,22 +65,22 @@ namespace Helpfulcore.Localization
 				}
 
 				Translate.RemoveKeyFromCache(key);
-				localizedString = Translate.Text(key);
+				localizedString = this.TranslateText(key, language);
 
 				if (localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase))
 				{
 					Translate.ResetCache(true);
-					localizedString = Translate.Text(key);
+					localizedString = this.TranslateText(key, language);
 				}
 
 				if (localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase))
 				{
-					localizedString = this.GetOrCreateDictionaryText(key, defaultValue, editable);
+					localizedString = this.GetOrCreateDictionaryText(key, defaultValue, editable, language);
 				}
 
 				if (!editable || !this.IsInEditingMode)
 				{
-					localizedString = Translate.Text(key);
+					localizedString = this.TranslateText(key, language);
 				}
 
 				if (!this.IsInEditingMode && !string.IsNullOrWhiteSpace(defaultValue) && (string.IsNullOrWhiteSpace(localizedString) || localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase)))
@@ -90,7 +96,23 @@ namespace Helpfulcore.Localization
 			}
 		}
 
-		protected virtual Item GetDictionaryPhraseItem(string key)
+		protected virtual string TranslateText(string key, string language)
+		{
+			if (string.IsNullOrEmpty(language))
+			{
+				return Translate.Text(key);
+			}
+
+			var lang = LanguageManager.GetLanguage(language);
+			if (lang != null)
+			{
+				return Translate.TextByLanguage(key, lang);
+			}
+
+			return Translate.Text(key);
+		}
+
+		protected virtual Item GetDictionaryPhraseItem(string key, string language)
 		{
 			var db = this.GetContentDatabase();
 
@@ -101,10 +123,19 @@ namespace Helpfulcore.Localization
 
 			var dictionaryItemPath = this.GetDictionaryItemPath(key);
 
+			if (!string.IsNullOrEmpty(language))
+			{
+				var lang = LanguageManager.GetLanguage(language);
+				if (lang != null)
+				{
+					return db.GetItem(dictionaryItemPath, lang);
+				}
+			}
+
 			return db.GetItem(dictionaryItemPath);
 		}
 
-		protected virtual string GetOrCreateDictionaryText(string key, string defaultValue, bool editable)
+		protected virtual string GetOrCreateDictionaryText(string key, string defaultValue, bool editable, string language)
 		{
 			var db = this.GetContentDatabase();
 
@@ -113,15 +144,13 @@ namespace Helpfulcore.Localization
 				return key;
 			}
 
-			var dictionaryItemPath = this.GetDictionaryItemPath(key);
-
-			var item = this.GetDictionaryPhraseItem(key) ?? this.CreateDictionaryEntryItem(key, defaultValue, db, dictionaryItemPath);
+			var item = this.GetDictionaryPhraseItem(key, language) ?? this.CreateDictionaryEntryItem(key, defaultValue, db, language);
 
 			if (item != null)
 			{
 				if (string.IsNullOrWhiteSpace(item[this.DictionaryPhraseFieldName]) && !string.IsNullOrWhiteSpace(defaultValue))
 				{
-					this.UpdateDictionaryEntryItem(item, key, defaultValue);
+					this.UpdateDictionaryEntryItem(item, key, defaultValue, language);
 				}
 
 				return editable
@@ -132,12 +161,14 @@ namespace Helpfulcore.Localization
 			return key;
 		}
 
-		protected virtual void UpdateDictionaryEntryItem(Item item, string key, string phraseValue)
+		protected virtual void UpdateDictionaryEntryItem(Item item, string key, string phraseValue, string language)
 		{
 			lock (CreateItemLock)
 			{
 				using (new SecurityDisabler())
 				{
+					item = this.SwhitchToLanguageVersion(language, item);
+
 					try
 					{
 						item.Editing.BeginEdit();
@@ -167,14 +198,19 @@ namespace Helpfulcore.Localization
 			}
 		}
 
-		protected virtual Item CreateDictionaryEntryItem(string key, string defaultValue, Database db, string dictionaryItemPath)
+		protected virtual Item CreateDictionaryEntryItem(string key, string defaultValue, Database db, string language)
 		{
+			var dictionaryItemPath = this.GetDictionaryItemPath(key);
+
 			lock (CreateItemLock)
 			{
 				Item item;
 				using (new SecurityDisabler())
 				{
 					item = db.CreateItemPath(dictionaryItemPath, this.DictionaryTemplateFolder, this.DictionaryTemplateItem);
+
+					item = this.SwhitchToLanguageVersion(language, item);
+
 					try
 					{
 						item.Editing.BeginEdit();
@@ -206,6 +242,24 @@ namespace Helpfulcore.Localization
 
 				return item;
 			}
+		}
+
+		protected virtual Item SwhitchToLanguageVersion(string language, Item item)
+		{
+			if (!string.IsNullOrEmpty(language))
+			{
+				var lang = LanguageManager.GetLanguage(language);
+				if (lang != null)
+				{
+					item = item.Database.GetItem(item.ID, lang);
+					if (item.Versions.GetVersions(false).Length == 0)
+					{
+						item = item.Versions.AddVersion();
+					}
+				}
+			}
+
+			return item;
 		}
 
 		protected virtual Database GetContentDatabase()
@@ -254,7 +308,7 @@ namespace Helpfulcore.Localization
 
 		protected virtual string GetDictionaryItemPath(string key)
 		{
-			var relativeItemPath = ItemUtil.ProposeValidItemName(key);
+			var relativeItemPath = key;
 
 			if (this.UseDotSeparatedKeyNotaion)
 			{

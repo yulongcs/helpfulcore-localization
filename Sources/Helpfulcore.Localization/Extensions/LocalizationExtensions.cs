@@ -10,9 +10,10 @@ namespace Helpfulcore.Localization.Extensions
 			string key, 
 			string defaultValue = null,
 			bool editable = false, 
+			string language = null, 
 			bool autoCreate = true)
         {
-            return new HtmlString(LocalizationFactory.LocalizationService.Localize(key, defaultValue, editable, autoCreate));
+            return new HtmlString(LocalizationFactory.LocalizationService.Localize(key, defaultValue, editable, language, autoCreate));
         }
     }
 }
