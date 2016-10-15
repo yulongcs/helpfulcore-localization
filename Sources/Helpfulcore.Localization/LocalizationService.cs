@@ -17,6 +17,8 @@ namespace Helpfulcore.Localization
 {
 	public class LocalizationService : ILocalizationService
 	{
+		private readonly LocalizationCache Cache = new LocalizationCache();
+
 		private static readonly object CreateItemLock = new object();
 
 		public virtual bool AutoCreateDictionaryItems { get; set; }
@@ -28,6 +30,31 @@ namespace Helpfulcore.Localization
 			bool editable = false, 
 			string language = null,
 			bool autoCreate = true)
+		{
+			try
+			{
+				if (this.IsInEditingMode)
+				{
+					return this.Process(key, defaultValue, editable, language, autoCreate);
+				}
+
+				var value = this.Cache.Get(key);
+
+				if (value == null)
+				{
+					value = this.Process(key, defaultValue, editable, language, autoCreate);
+					this.Cache.Set(key, value);
+				}
+
+				return value;
+			}
+			catch
+			{
+				return Translate.Text(key);
+			}
+		}
+
+		protected virtual string Process(string key, string defaultValue, bool editable, string language, bool autoCreate)
 		{
 			try
 			{
@@ -47,7 +74,8 @@ namespace Helpfulcore.Localization
 				{
 					localizedString = this.TranslateText(key, language);
 
-					if (!this.IsInEditingMode && !string.IsNullOrWhiteSpace(defaultValue) && localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase))
+					if (!this.IsInEditingMode && !string.IsNullOrWhiteSpace(defaultValue) &&
+					    localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase))
 					{
 						return defaultValue;
 					}
@@ -83,7 +111,9 @@ namespace Helpfulcore.Localization
 					localizedString = this.TranslateText(key, language);
 				}
 
-				if (!this.IsInEditingMode && !string.IsNullOrWhiteSpace(defaultValue) && (string.IsNullOrWhiteSpace(localizedString) || localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase)))
+				if (!this.IsInEditingMode && !string.IsNullOrWhiteSpace(defaultValue) &&
+				    (string.IsNullOrWhiteSpace(localizedString) ||
+				     localizedString.Equals(key, StringComparison.InvariantCultureIgnoreCase)))
 				{
 					localizedString = defaultValue;
 				}
