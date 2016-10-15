@@ -50,6 +50,7 @@
   <ItemGroup>
     <Compile Include="Extensions\LocalizationExtensions.cs" />
     <Compile Include="ILocalizationService.cs" />
+    <Compile Include="LocalizationCache.cs" />
     <Compile Include="LocalizationFactory.cs" />
     <Compile Include="LocalizationService.cs" />
     <Compile Include="Pipelines\Initialize\InitializeLocalizationService.cs" />
