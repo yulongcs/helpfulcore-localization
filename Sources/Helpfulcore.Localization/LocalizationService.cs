@@ -120,8 +120,10 @@ namespace Helpfulcore.Localization
 
 				return localizedString;
 			}
-			catch
+			catch (Exception ex)
 			{
+                Log.Error(string.Format("[LocalizationService]: Error while translating phrase with key '{0}'", key) + ex.Message, ex, this);
+
 				return Translate.Text(key);
 			}
 		}
@@ -442,7 +444,7 @@ namespace Helpfulcore.Localization
 		{
 			get
 			{
-				return Sitecore.Context.PageMode.IsPageEditor || Sitecore.Context.PageMode.IsPageEditorDesigning;
+				return Sitecore.Context.PageMode.IsExperienceEditor|| Sitecore.Context.PageMode.IsExperienceEditorEditing;
 			}
 		}
 
